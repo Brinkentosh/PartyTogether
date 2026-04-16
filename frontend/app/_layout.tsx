@@ -7,42 +7,36 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // 1. Kolla om vi har en token när appen startar
+  // 1. Initial check vid start
   useEffect(() => {
-    const checkToken = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('userToken');
-        if (token) {
-          setIsLoggedIn(true);
-        }
-      } catch (error) {
-        console.error("Kunde inte läsa token", error);
-      } finally {
-        setIsLoaded(true);
-      }
+    const prepare = async () => {
+      // Vi behöver bara veta att vi har kollat minnet en gång
+      setIsLoaded(true);
     };
-
-    checkToken();
+    prepare();
   }, []);
 
-  // 2. Hantera navigeringen baserat på inloggningsstatus
+  // 2. Dörrvakten: Körs varje gång 'segments' ändras (dvs när vi navigerar)
   useEffect(() => {
     if (!isLoaded) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const checkAuth = async () => {
+      const token = await SecureStore.getItemAsync('userToken');
+      const inAuthGroup = segments[0] === '(auth)';
 
-    if (!isLoggedIn && !inAuthGroup) {
-      // Om man inte är inloggad och inte är i auth-mappen -> skicka till login
-      router.replace('/(auth)/login');
-    } else if (isLoggedIn && inAuthGroup) {
-      // Om man är inloggad men råkar vara i auth-mappen -> skicka till appen
-      router.replace('/(tabs)');
-    }
-  }, [isLoggedIn, segments, isLoaded]);
+      if (!token && !inAuthGroup) {
+        // Ingen token och inte i login-vyn -> tvinga till login
+        router.replace('/(auth)/login');
+      } else if (token && inAuthGroup) {
+        // Har token men är i login-vyn -> skicka till appen
+        router.replace('/(tabs)');
+      }
+    };
 
-  // Medan vi kollar SecureStore visar vi en laddningssnurra
+    checkAuth();
+  }, [segments, isLoaded]);
+
   if (!isLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -53,10 +47,8 @@ export default function RootLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Vi definierar våra två huvudgrupper här */}
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      {/* Modal kan ligga kvar om du vill ha kvar templaten för den */}
       <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: true }} />
     </Stack>
   );
